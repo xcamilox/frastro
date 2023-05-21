@@ -5,7 +5,7 @@ from astroquery.simbad import Simbad
 from astropy import coordinates as coords
 from astropy.coordinates import Angle
 from django.conf.urls.static import static
-from frastro import CoordinateParser
+from frastro import CoordinateParser, VOTableUtil
 from frastro import SDSSArchiveCP
 from frastro import UkidssArchiveCP
 from frastro import PanSTARRSArchiveCP
@@ -15,6 +15,10 @@ from frastro import DesAchiveCP
 from frastro import WiseAllWiseArchiveCP
 from frastro import SpitzerArcvhiveCP
 from frastro import VHSAchiveCP
+from frastro import Config
+
+import numpy as np
+import pandas as pd
 
 
 import json
@@ -30,11 +34,13 @@ class Query():
     __radius=1.0
     __id=0
     __tags=[]
+    __config=Config()
 
 
     def __init__(self):
         self.__procedureId = time.time()
         self.__results={"procedureId":self.__procedureId,"archives":[],"ra":0,"dec":0,"id":0,"pos":"","tag":[],"summary":{}}
+        self.__tmpPath = self.__config.getPath("tmp")
 
     def __addResult(self,archive,status,result,tags):
 
@@ -77,10 +83,68 @@ class Query():
 
         #self.__addResult("vizier", self.searchVizier())
         #self.__addResult("simbad",self.searchSimbad())
-
+        self.createSed()
         return self.__results
 
 
+    def createSed(self):
+        x_wavelenght=[]
+        y_magnitudes=[]
+        labels=[]
+        item = self.__results
+        id = self.__results["id"]
+        for archive in self.__results["archives"]:
+            for prop in archive["data"]["summary"]:
+                sumary=archive["data"]["summary"][prop]
+                if isinstance(sumary, dict):
+                    if "lambda" in sumary:
+
+                        x_wavelenght.append(sumary["lambda"])
+                        y_magnitudes.append(sumary["ab"])
+                        labels.append(archive["archive"]+"_"+prop)
+
+        dtype = [('label', 'U20'), ('wavelength', float), ('abmagnitude', float)]
+
+        for inx in range(len(y_magnitudes)):
+            if y_magnitudes[inx] == "--" or float(y_magnitudes[inx]) < 0:
+                y_magnitudes[inx] = 0
+
+        tosort = []
+        for ind in range(len(labels)):
+            tosort.append((labels[ind], x_wavelenght[ind], y_magnitudes[ind]))
+
+        sortval = np.array(tosort, dtype=dtype)
+        sed = np.sort(sortval, order='wavelength')
+        typesval = []
+        typesval = [label.replace(" ", "_") for label in sed["label"].tolist()]
+
+        vals = sed["abmagnitude"].tolist()
+
+        # typesval.append(("ra",float))
+        typesval.append("ra")
+        vals.append(item["ra"])
+        # typesval.append(("dec", float))
+        typesval.append("dec")
+        vals.append(item["dec"])
+
+        setvals = np.array(vals).reshape(1, len(vals))
+
+        df = pd.DataFrame(setvals, columns=typesval, dtype=float)
+        catTable = Table.from_pandas(df)
+
+        path_cat = self.__tmpPath + id + "/catalog.xml"
+
+        df = pd.DataFrame(sed)
+        sedTable = Table.from_pandas(df)
+
+        SEDpath = self.__tmpPath + id + "/sed_" + id + ".xml"
+
+
+        VOTableUtil.saveFromTable(catTable, path_cat)
+        VOTableUtil.saveFromTable(sedTable, SEDpath)
+
+        self.__results["sed"] = {"labels": sed["label"].tolist(), 'wavelength': sed["wavelength"].tolist(),
+                        'abmagnitude': sed["abmagnitude"].tolist(), "local_path": SEDpath}
 
     def serchUkidss(self):
         search_catalog_cp = UkidssArchiveCP()

@@ -32,6 +32,7 @@ class PanSTARRSArchiveCP(ContentProvider):
     __save_path = "/Users/cjimenez/Documents/PHD/data/tmp/{0}/panstarss/"
 
     __wavelenght = {"g": 486 * u.nm, "r": 621 * u.nm, "i": 754 * u.nm, "z": 867 * u.nm, "y": 963 * u.nm}
+    __key_band = {"mag_g": "gMeanApMag", "mag_r": "rMeanApMag", "mag_i": "iMeanApMag", "mag_z": "zMeanApMag","mag_y": "yMeanApMag",}
 
     #def query_region(self,):
 
@@ -75,15 +76,15 @@ class PanSTARRSArchiveCP(ContentProvider):
         result = AstroSource(self.__coordinates)
         #cover limit -30 degrees
         if self.__coordinates.dec.degree>=-30:
-            cat=self.getCatalog(self.__coordinates.ra.degree, self.__coordinates.dec.degree,radius).json()
+            table,cat=self.getCatalog(self.__coordinates.ra.degree, self.__coordinates.dec.degree,radius)
             if len(cat)>0:
                 #conver json data to pandas for pick up ra dec columns, each column was converted to degree values
-                df = pd.DataFrame(cat)
+                df = pd.DataFrame(cat.json())
                 coord_list = [SkyCoord(df["raMean"][index].replace(" ",":")+" "+df["decMean"][index].replace(" ",":"), unit=(u.hour, u.deg), frame='icrs')for index in range(df["raMean"].size)]
                 ra_list=[ra.ra.degree for ra in coord_list]
                 dec_list = [dec.dec.degree for dec in coord_list]
 
-                table = Table.from_pandas(df)
+                #table = Table.from_pandas(df)
                 Utils.createPath(self.__save_path)
                 catalog = CatalogSource("panstars", "Search in radius " + str(radius))
                 VOTableUtil.saveFromTable(table, self.__save_path + "catalog.xml")
@@ -130,6 +131,13 @@ class PanSTARRSArchiveCP(ContentProvider):
                 result.addSummaryParams("error","Any results was found in Panstarss Archive")
         return result
 
+    def getBand(self, band):
+
+        key_band = ""
+        if band in self.__key_band:
+            key_band = self.__key_band[band]
+        return key_band
+
     def getCatalog(self,ra_deg, dec_deg, rad_arcmin,filter=['color','g','r','i','z','y']):
 
         """
@@ -156,7 +164,7 @@ class PanSTARRSArchiveCP(ContentProvider):
         ordercolumn3: 
         coordformat: sex
         outputformat: JSON
-        max_records: 5001
+        max_records: 50001
         max_rpp: 5000
         action: Search
         """
@@ -175,13 +183,25 @@ class PanSTARRSArchiveCP(ContentProvider):
             'ordercolumn3':'',
             'coordformat': 'sex',
             'outputformat': 'JSON',
-            'max_records': 5001,
+            'max_records': 50001,
             'max_rpp': 5000,
             'action': 'Search'
         }
 
         r = self.panstars_request(self.__server_catalog, params=params)
-        return r
+        print("panstars",r)
+        table=[]
+        json=r.json()
+        if r.status_code ==200:
+            df = pd.DataFrame(r.json())
+            df["gMeanApMag"]=pd.to_numeric(df["gMeanApMag"], errors='coerce')
+            df["rMeanApMag"] = pd.to_numeric(df["rMeanApMag"], errors='coerce')
+            df["iMeanApMag"] = pd.to_numeric(df["iMeanApMag"], errors='coerce')
+            df["zMeanApMag"] = pd.to_numeric(df["zMeanApMag"], errors='coerce')
+            df["yMeanApMag"] = pd.to_numeric(df["yMeanApMag"], errors='coerce')
+            table = Table.from_pandas(df)
+
+        return table,r
 
 
 
@@ -276,7 +296,10 @@ class PanSTARRSArchiveCP(ContentProvider):
 
     def panstars_request(self,url,params):
 
-        r = requests.get(url,params=params)
+        try:
+            r = requests.get(url,params=params)
+        except ConnectionError:
+            r=[]
         return r
 
 

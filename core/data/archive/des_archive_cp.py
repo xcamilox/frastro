@@ -22,10 +22,18 @@ class DesAchiveCP(ContentProvider):
     __save_path = "/Users/cjimenez/Documents/PHD/data/tmp/{0}/des/"
 
     __wavelenght = {"g": 475 * u.nm, "r": 635 * u.nm, "i": 775 * u.nm, "z": 925 * u.nm, "y": 1000 * u.nm}
+    __key_band = {"mag_g": "mag_auto_g", "mag_r": "mag_auto_r", "mag_i": "mag_auto_i", "mag_z": "mag_auto_z",
+                  "mag_y": "mag_auto_y", }
 
     def __init__(self):
         self.__noao = NOAOArchiveCP()
 
+    def getBand(self, band):
+
+        key_band = ""
+        if band in self.__key_band:
+            key_band = self.__key_band[band]
+        return key_band
 
     def query(self, **kwargs):
         if "coordinates" in kwargs:
@@ -43,7 +51,7 @@ class DesAchiveCP(ContentProvider):
         self.__arcmin_range = radius
         self.__degrees_range = CoordinateParser.getMinToDegree(radius)
         result = AstroSource(self.__coordinates)
-        df =self.getCatalogFromSIAS()
+        table,df =self.getCatalogFromSIAS()
 
         # GET catalogs from SIAS DB, the object is selected from the near source using Pythagorean theorem
         if len(df.index)>0:
@@ -51,7 +59,7 @@ class DesAchiveCP(ContentProvider):
             self.loss=loss
             self.setSummary(result,df.iloc[index])
 
-            table = Table.from_pandas(df)
+            #table = Table.from_pandas(df)
             Utils.createPath(self.__save_path)
             catalog = CatalogSource("des", "Search in radius " + str(self.__arcmin_range))
             VOTableUtil.saveFromTable(table, self.__save_path + "catalog.xml")
@@ -109,6 +117,25 @@ class DesAchiveCP(ContentProvider):
         result.addSummaryParams("fluxerr_i", str(respond["fluxerr_auto_i"]))
         result.addSummaryParams("fluxerr_z", str(respond["fluxerr_auto_z"]))
         result.addSummaryParams("fluxerr_y", str(respond["fluxerr_auto_y"]))
+
+
+    def getCatalog(self,ra,dec,radius):
+
+        self.__coordinates = str(ra) + "," + str(dec)
+        radius = radius  # arcmin
+        self.__coordinates = CoordinateParser.validateCoordinates(self.__coordinates)
+        self.__save_path = self.__save_path.format(
+            str(self.__coordinates.ra.degree) + "_" + str(self.__coordinates.dec.degree))
+
+        self.__arcmin_range = radius
+        self.__degrees_range = CoordinateParser.getMinToDegree(radius)
+        result = AstroSource(self.__coordinates)
+        df =self.getCatalogFromSIAS()
+        try:
+            table = Table.from_pandas(df)
+        except AttributeError:
+            table = []
+        return table,df
 
     def getCatalogFromSIAS(self):
 
@@ -177,3 +204,12 @@ class DesAchiveCP(ContentProvider):
         pass
     def update(self):
         pass
+
+
+if __name__ == "__main__":
+
+    ra=75.757204
+    dec=-39.762352
+    des=DesAchiveCP()
+    cat=des.getCatalog(ra,dec,2)
+    print(cat)

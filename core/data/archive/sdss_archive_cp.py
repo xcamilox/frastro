@@ -1,14 +1,24 @@
-from frastro import ContentProvider
+from frastro.frastro.core.data.interface.content_provider import ContentProvider
 from astroquery.sdss import SDSS
-from frastro import CoordinateParser
-from frastro import AstroSource
-from frastro import ImageSource
-from frastro import CatalogSource
-from frastro import SpectraSource
+from frastro.frastro.core.utils.coordinates_parser import CoordinateParser
+from frastro.frastro.core.data.astrosource.astro_source import AstroSource
+from frastro.frastro.core.data.astrosource.image_source import ImageSource
+from frastro.frastro.core.data.astrosource.catalog_source import CatalogSource
+from frastro.frastro.core.data.astrosource.spectra_source import SpectraSource
 import astropy.units as u
-from frastro import VOTableUtil
-from frastro import Utils, WaveLenghtCover
+from frastro.frastro.core.utils.votable_util import VOTableUtil
+from frastro.frastro.core.utils.utils import Utils
+from frastro.frastro.core.utils.wavelenght_cover import WaveLenghtCover
+import json
+from astropy import coordinates
+from collections import OrderedDict
 import requests
+from astropy.coordinates import SkyCoord
+from astropy import units as u
+
+
+
+import pandas as pd
 
 class SDSSArchiveCP(ContentProvider):
 
@@ -18,7 +28,8 @@ class SDSSArchiveCP(ContentProvider):
         "imageformat":"https://dr12.sdss.org/sas/dr12/boss/photoObj/frames/rerun/run/camcol/frame-g-00run-camcol-field.fits.bz2",
         "image": "https://dr12.sdss.org/sas/dr{0}/boss/photoObj/frames/{1}/{2}/{3}/frame-{4}-{5}-{6}-{7}.{8}",
         "display":"http://skyserver.sdss.org/dr14/en/tools/explore/summary.aspx?ra={0}&dec={1}",
-        "tapprovider":"http://skyserver.sdss.org/dr14/en/tools/search/x_results.aspx?searchtool=SQL&TaskName=Skyserver.Search.SQL&syntax=NoSyntax&cmd={0}"
+        "tapprovider":"http://skyserver.sdss.org/dr14/en/tools/search/x_results.aspx?searchtool=SQL&TaskName=Skyserver.Search.SQL&syntax=NoSyntax&cmd={0}",
+        "sql_server":"http://skyserver.sdss.org/dr{0}/en/tools/search/x_results.aspx"
 
     }
 
@@ -27,9 +38,11 @@ class SDSSArchiveCP(ContentProvider):
 
     __wavelenght = {"u":354 *u.nm ,"g": 477 * u.nm, "r": 623 * u.nm, "i": 762 * u.nm, "z": 913 * u.nm}
 
+    __key_band = {"mag_u":"u","mag_g":"g","mag_r":"r","mag_i":"i","mag_z":"z"}
+
     __coordinates=000
 
-    __data_release=14
+    __data_release=16
     __image_release=12
 
     def __init__(self,catalog_provider='SDSS'):
@@ -39,6 +52,20 @@ class SDSSArchiveCP(ContentProvider):
 
     def onCreate(self):
         pass
+
+    def getCatalog(self,ra,dec,radius):
+        self.__coordinates = str(ra) + "," + str(dec)
+        self.__coordinates = CoordinateParser.validateCoordinates(self.__coordinates)
+        respond = SDSS.query_region(self.__coordinates, spectro=False,
+                                    photoobj_fields=['ra', 'dec', 'objid', 'run', 'type', 'rerun', 'camcol', 'field',
+                                                     'u', 'g',
+                                                     'r', 'i', 'z', 'err_u', 'err_g', 'err_r', 'err_i', 'err_z'],
+                                    data_release=self.__data_release,
+                                    radius=radius * u.arcmin)
+
+
+        return respond
+
 
     def query(self, **kwargs):
 
@@ -79,6 +106,7 @@ class SDSSArchiveCP(ContentProvider):
         # print(respond)
         # for col in respond.columns:
         #     print(respond[col])
+
 
 
 
@@ -149,6 +177,13 @@ class SDSSArchiveCP(ContentProvider):
             result.addSummaryParams("error","Any results was found in SDSS Archive")
 
         return result
+
+    def getBand(self,band):
+
+        key_band=""
+        if band in self.__key_band:
+            key_band=self.__key_band[band]
+        return key_band
 
     def getImageCutout(self,ra,dec,scale=0.396127,width=300,height=300,opt="G",query="GA",low_mag=0,high_mag=30):
 
@@ -291,7 +326,68 @@ class SDSSArchiveCP(ContentProvider):
 
         return paths
 
+    def getRedshift(self,ra,dec,radio=15):
+        radio=radio*u.arcsec
+        radio=radio.to("deg").value
+        co = coordinates.SkyCoord(ra=ra, dec=dec, unit=(u.deg, u.deg))
 
+
+
+        ra_min =co.ra.degree - (radio / 2)
+        ra_max = co.ra.degree + (radio / 2)
+        dec_min = co.dec.degree - (radio / 2)
+        dec_max = co.dec.degree + (radio / 2)
+        query="""SELECT p.objid,p.ra,p.dec,p.u,p.g,p.r,p.i,p.z,p.err_u, p.err_g, p.err_r, p.err_i, p.err_z, p.run, p.rerun, p.camcol,p.type as photo_type ,p.field,s.specobjid,s.sourceType as s_type, s.class as spec_type, s.z as spec_z,s.zErr as spec_zerr, s.plate, s.mjd, s.fiberid,pz.z as photo_z, pz.zErr as photo_zerr
+        FROM PhotoObjAll AS p
+           left outer join SpecObj AS s ON p.objid = s.bestobjid
+           left outer join Photoz as pz on p.objid = pz.objid
+        WHERE 
+           p.ra BETWEEN {0} AND {1}
+           AND p.dec BETWEEN {2} AND {3}"""
+
+        json_result = self.SQLRequest(query.format(ra_min,ra_max,dec_min,dec_max))
+
+        dp_result = pd.DataFrame(json_result[0]["Rows"])
+
+        if len(json_result[0]["Rows"])>0:
+
+            ra_ref = dp_result["ra"].tolist()
+            dec_ref = dp_result["dec"].tolist()
+            cref = SkyCoord([ra], [dec], frame='icrs', unit='deg')
+            c1 = SkyCoord(ra_ref, dec_ref, frame='icrs', unit='deg')
+            desi_distance = cref.separation(c1).arcsec
+            dp_result["separation"] = desi_distance
+
+        return dp_result
+
+
+
+    def SQLRequest(self,command):
+        url_service=self.__service_provider["sql_server"].format(self.__data_release)
+        params= {"cmd":command,"format":"json","searchtool":"SQL","TaskName":"Skyserver.Search.SQL","syntax":"NoSyntax"}
+        json_file = OrderedDict(params)
+        r=requests.get(url_service,params=json_file)
+        return r.json()
+
+    @staticmethod
+    def getSpecType(id):
+
+        types = ["GALAXY", "QSO", "STAR_BHB", "STAR_CARBON", "STAR_BROWN_DWARF", "STAR_SUB_DWARF", "STAR_CATY_VAR", "STAR_RED_DWARF", "STAR_WHITE_DWARF", "REDDEN_STD","SPECTROPHOTO_STD","HOT_STD","ROSAT_A","ROSAT_B","ROSAT_C","ROSAT_D","SERENDIPITY_BLUE","SERENDIPITY_FIRST","SERENDIPITY_RED","SERENDIPITY_DISTANT","SERENDIPITY_MANUAL","QA","SKY","NA","STAR_PN"]
+        if type(id) is int and id < len(types):
+            return types[id]
+        else:
+            return "ANYTYPE"
+
+
+    @staticmethod
+    def getPhotoType(id):
+
+
+        types=["UNKNOWN","COSMIC_RAY","DEFECT","GALAXY","GHOST","KNOWNOBJ","STAR","TRAIL","SKY","NOTATYPE"]
+        if type(id) is int and id < len(types):
+            return types[id]
+        else:
+            return "ANYTYPE"
 
     def contentUrl(self):
         pass

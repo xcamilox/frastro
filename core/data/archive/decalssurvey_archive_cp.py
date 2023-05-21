@@ -16,14 +16,26 @@ class DecalsSurveyArchiveCP(ContentProvider):
     }
     __catalog_provider="decals"
     __simple_rec_query= "SELECT * FROM ls_dr6.tractor WHERE((ra between {0} and {1}) and (dec between {2} and {3}))"
+    __simple_rec_query_dr7 = "SELECT * FROM ls_dr7.tractor WHERE((ra between {0} and {1}) and (dec between {2} and {3}))"
     __save_path = "/Users/cjimenez/Documents/PHD/data/tmp/{0}/decals/"
 
     __wavelenght = {"g": 475 * u.nm, "r": 635 * u.nm, "i": 775 * u.nm, "z": 925 * u.nm}
+    __key_band = {"mag_g": "mag_g", "mag_r": "mag_r", "mag_i": "mag_i", "mag_z": "mag_z"}
 
+    __data_release = 6
     #flux in nanomagies
 
     def __init__(self):
         pass
+
+
+    def getBand(self, band):
+
+        key_band = ""
+        if band in self.__key_band:
+            key_band = self.__key_band[band]
+        return key_band
+
 
     def query(self, **kwargs):
         if "coordinates" in kwargs:
@@ -45,9 +57,14 @@ class DecalsSurveyArchiveCP(ContentProvider):
         ra_max = self.__coordinates.ra.degree + (degrees_range/2)
         dec_min = self.__coordinates.dec.degree - (degrees_range/2)
         dec_max = self.__coordinates.dec.degree + (degrees_range/2)
-        query = self.__simple_rec_query.format(ra_min,ra_max,dec_min,dec_max)
+        query = self.__simple_rec_query_dr7.format(ra_min,ra_max,dec_min,dec_max)
         respond=self.getTapRequest(query=query)
         result = AstroSource(self.__coordinates)
+
+        if len(respond)<=0:
+            query = self.__simple_rec_query.format(ra_min, ra_max, dec_min, dec_max)
+            respond = self.getTapRequest(query=query)
+
         if len(respond)>0:
 
             Utils.createPath(self.__save_path)
@@ -103,6 +120,28 @@ class DecalsSurveyArchiveCP(ContentProvider):
 
         return result
 
+
+
+    def getCatalog(self,ra,dec,radius):
+        self.__coordinates = str(ra) + "," + str(dec)
+        radius = radius  # arcmin
+
+        self.__coordinates = CoordinateParser.validateCoordinates(self.__coordinates)
+        self.__save_path = self.__save_path.format(
+            str(self.__coordinates.ra.degree) + "_" + str(self.__coordinates.dec.degree))
+
+        degrees_range = CoordinateParser.getMinToDegree(radius)
+
+        ra_min = self.__coordinates.ra.degree - (degrees_range / 2)
+        ra_max = self.__coordinates.ra.degree + (degrees_range / 2)
+        dec_min = self.__coordinates.dec.degree - (degrees_range / 2)
+        dec_max = self.__coordinates.dec.degree + (degrees_range / 2)
+        query = self.__simple_rec_query_dr7.format(ra_min, ra_max, dec_min, dec_max)
+        respond = self.getTapRequest(query=query)
+
+        return respond
+
+
     def getTapRequest(self, query=""):
 
         tap = TAPManager()
@@ -115,9 +154,9 @@ class DecalsSurveyArchiveCP(ContentProvider):
 
     def getImage(self,coordinates,band):
 
-        grz="http://legacysurvey.org/viewer/{0}-cutout?ra={1}&dec={2}&layer=mzls+bass-dr6&pixscale=0.27&bands={3}"
+        grz="http://legacysurvey.org/viewer/{0}-cutout?ra={1}&dec={2}&layer=mzls+bass-dr"+self.__data_release+"&pixscale=0.27&bands={3}"
 
-        display="http://legacysurvey.org/viewer?ra={0}&dec={1}&zoom=15&layer=mzls+bass-dr6"
+        display="http://legacysurvey.org/viewer?ra={0}&dec={1}&zoom=15&layer=mzls+bass-dr"+self.__data_release
 
         image={'fits':grz.format("fits",coordinates.ra.degree,coordinates.dec.degree,band),'jpeg':grz.format("jpeg",coordinates.ra.degree,coordinates.dec.degree,band),'link':display.format(coordinates.ra.degree,coordinates.dec.degree)}
 

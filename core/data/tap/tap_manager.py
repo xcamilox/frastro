@@ -1,5 +1,5 @@
 from astroquery.utils.tap.core import TapPlus
-
+from frastro import LOGUtil
 
 class TAPManager():
     __tap_connector=None
@@ -36,10 +36,11 @@ class TAPManager():
         conector = self.connect()
         try:
             job=conector.launch_job(query,dump_to_file=dump_to_file)
-            print("rows: ",len(job.get_results()))
-        except ValueError as e:
+            LOGUtil.log("rows: "+str(len(job.get_results())))
+        except (ValueError,Exception) as e:
             print(e)
             job = JOBError()
+
         return job
 
     def async_query(self,query,dump_to_file=False):
@@ -53,5 +54,5 @@ class TAPManager():
 
 class JOBError():
     def get_results(self):
-        print("Tap query request error service")
+        LOGUtil.log("Tap query request error service")
         return []

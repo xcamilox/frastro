@@ -1,9 +1,7 @@
 from astropy.io import fits
 
-from astropy import utils, io
 from astropy import wcs
 import numpy as np
-from astropy import units as u
 from reproject import reproject_interp
 import matplotlib.pyplot as plt
 from astropy.wcs import WCS
@@ -23,6 +21,24 @@ class FITSFile():
         for hd in file:
             headers.append(hd.header)
         return headers
+
+    @staticmethod
+    def getImage(filepath,hdul_idx=None):
+        file=FITSFile.open(filepath)
+        if hdul_idx!=None:
+            return file[hdul_idx]
+        else:
+            images=[]
+            if len(file) > 0:
+                for hdl in file:
+                    if "NAXIS" in hdl.header:
+                        if hdl.header["NAXIS"] > 0:
+                            images.append(hdl)
+                        else:
+                            continue
+            return images
+
+
 
     @staticmethod
     def cropToFile(reference_file_fits,file_fits):
@@ -62,16 +78,6 @@ class FITSFile():
 
         coordinate = wcs_file.wcs_pix2world(centerX,centerY,0)
 
-        print(coordinate[0],coordinate[1])
-        print((centerX-int(centerX)))
-        print((centerY - int(centerY)))
-
-
-
-
-        print(y_axes.min()-int(y_axes.min()), y_axes.max()-int(y_axes.max()), x_axes.min()-int(x_axes.min()), x_axes.max()-int(x_axes.max()))
-        print(int(y_axes.min()),int(y_axes.max()),int(x_axes.min()),int(x_axes.max()))
-
         new_data=file_data[int(y_axes.min()):int(y_axes.max()),int(x_axes.min()):int(x_axes.max())]
 
 
@@ -96,10 +102,10 @@ class FITSFile():
 
 
     @staticmethod
-    def saveFile(path,npa_data=[],header=[]):
+    def saveFile(path,npa_data=[],header=[],overwrite=True):
         hdu=fits.PrimaryHDU(data=npa_data,header=header)
         hdul = fits.HDUList([hdu])
-        hdul.writeto(path,overwrite=True)
+        hdul.writeto(path,overwrite=overwrite)
 
 
 
@@ -119,7 +125,7 @@ class FITSFile():
 
         newdata=fit(data)
 
-        print(newdata.shape)
+
         header=file[hdu].header
         FITSFile.saveFile(outpath,npa_data=newdata,header=header)
 
@@ -136,8 +142,8 @@ class FITSFile():
 
     @staticmethod
     def reprojectionImage(reference_path,target_path):
-        ref = FITSFile.open(reference_path)
-        target = FITSFile.open(target_path)
+        ref = fits.open(reference_path)
+        target = fits.open(target_path)
 
         data=target[0]
         new_data, footprint = reproject_interp(data,ref[0].header)
@@ -159,6 +165,7 @@ class FITSFile():
         ax2.set_title('MSX band E image footprint')
         plt.show()
 
+        fits.writeto('/Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181109_26_4_1_1_rotate.fits', new_data, ref[0].header, clobber=True)
 
 
 
@@ -182,17 +189,95 @@ if __name__ == "__main__":
 
     #liverpool
     ref = "/Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ1538+5817/h_e_20180717_47_1_1_1.fits"
-    newFile = FITSFile.scaleImage(ref, ref + "_rescale.fits", "file", 50000, 1, hdu=0)
+    #newFile = FITSFile.scaleImage(ref, ref + "_rescale.fits", "file", 50000, 1, hdu=0)
     ref = "/Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ1538+5817/h_e_20180801_27_1_1_1.fits"
-    newFile = FITSFile.scaleImage(ref, ref + "_rescale.fits", "file", 50000, 1, hdu=0)
+    #newFile = FITSFile.scaleImage(ref, ref + "_rescale.fits", "file", 50000, 1, hdu=0)
     #hst
     ref = "/Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ1538+5817/SLACSJ1538+5817_10587_53834_F814W_1.fits"
-    newFile = FITSFile.scaleImage(ref, ref + "_rescale.fits", "file", 50000, 1, hdu=1)
+    #newFile = FITSFile.scaleImage(ref, ref + "_rescale.fits", "file", 50000, 1, hdu=1)
+    ref = "/Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/hst/SLACSJ0330-0020_10886_53994_F814W_4.fits"
+    ref = "/Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/decals/legacysurvey-0526m002-image-r.fits"
+    #image=FITSFile.getImage(ref,hdul_idx=1)
+    #FITSFile.saveFile(ref+"_1.fits",image.data,image.header)
 
+    file="/Users/cjimenez/Documents/PHD/data/unlens_laes_rui/liris/SDSSJ122040.72+084238.1/SDSSJ122040.72+084238.1_bandH.fits"
+    file_out = "/Users/cjimenez/Documents/PHD/data/unlens_laes_rui/liris/SDSSJ122040.72+084238.1/SDSSJ122040.72+084238.1_bandH_scale.fits"
 
-
-    #newFile = FITSFile.scaleImage(file, file + "scale.fits", -0.9396, 50000, 1)
+    #newFile = FITSFile.scaleImage(file, file_out, -0.9396, 50000, 1)
 
     #FITSFile.reprojectionImage(ref,file)
 
+    file_header="/Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_obs/2018-11-06/h_e_20181105_27_4_1_1.fits"
+
+    file_data = "/Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/pydia/nov06/d_h_e_20181105_27_4_1_1.fits"
+    out_data = "/Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/pydia/nov06/f_d_h_e_20181105_27_4_1_1.fits"
+
+
+    """
+
+    data_header=FITSFile.open(file_header)
+    data_data = FITSFile.open(file_data)
+
+    FITSFile.saveFile(out_data,data_data[0].data,data_header[0].header)
+    """
+
+    """
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180814_25_1_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180816_75_1_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180816_75_2_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180816_75_3_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180822_91_1_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180822_91_2_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180822_91_3_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180906_96_1_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180906_96_2_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180906_96_3_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180917_78_1_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180917_78_2_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180917_78_3_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181005_75_1_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181005_75_2_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181005_75_3_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181016_70_1_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181016_70_2_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181016_70_3_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181016_70_4_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181016_70_5_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181105_27_1_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181105_27_2_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181105_27_3_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181105_27_4_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181105_28_1_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181105_28_2_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181105_28_3_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181105_28_4_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181105_28_5_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181109_26_1_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181109_26_2_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181109_26_3_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181109_26_4_1_1.fits
+    /Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181109_26_5_1_1.fits
+    """
+
+
+    ref="/Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20180917_78_2_1_1.fits"
+    file="/Users/cjimenez/Documents/PHD/data/liverpool_lens/SLACSJ0330-0020/liverpool_allobs/h_e_20181109_26_4_1_1.fits"
+    file="/Users/cjimenez/Documents/PHD/data/liverpool_lens/S4TMJ1031+3026/decals/cutout_157.8375_30.4494_30.fits"
+
+    image=FITSFile.open(file)
+    data=image[0].data
+    min=data.min()
+    max=data.max()
+
+    file_ref = "/Users/cjimenez/Documents/PHD/data/liverpool_lens/S4TMJ1031+3026/pydia/2018-12-10/obs/2018-12-10_1.39_stack.fits"
+    image_ref = FITSFile.open(file_ref)
+    data_ref = image_ref[0].data
+    min_ref = data_ref.min()
+    max_ref = data_ref.max()
+
+
+    file_out="/Users/cjimenez/Documents/PHD/data/liverpool_lens/S4TMJ1031+3026/decals/resize_decals_r.fits"
+
+    #FITSFile.saveFile(file_out, data + 900, image[0].header)
+    FITSFile.scaleImage(file, file_out, "file", max_ref, 0)
 

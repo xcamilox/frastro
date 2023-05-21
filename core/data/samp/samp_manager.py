@@ -12,7 +12,7 @@ class SAMPManager():
     __hub =None
     __server_name = "frastro server"
     __server_description = "frastro Web client"
-    __server_description_html = "<h1>frastro Web client</h1>"
+    __server_description_html = "<h1>frastro app client</h1>"
     __author = "Camilo E. Jimenez-Angel"
     __instritution = "IAC"
     __email_contact = "camilo.jimenez@iac.es"

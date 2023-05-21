@@ -1,3 +1,5 @@
+import os
+
 from astropy.io.votable.tree import VOTableFile, Resource, Table, Field
 from astropy.io.votable import parse_single_table
 from astropy.io.votable import from_table, writeto
@@ -42,4 +44,7 @@ class VOTableUtil():
     @staticmethod
     def saveFromTable(table,ouputfile):
         votable = from_table(table)
+        dir=os.path.dirname(ouputfile)
+        if not os.path.exists(dir):
+            os.makedirs(dir)
         writeto(votable, ouputfile)

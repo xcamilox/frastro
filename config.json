@@ -1,0 +1,35 @@
+{
+  "paths":{
+    "tmp":"/Users/cjimenez/Documents/PHD/data/tmp/",
+    "log":"/Users/cjimenez/Documents/PHD/data/tmp/log.log",
+    "liverpool_sn":"/Users/cjimenez/Documents/PHD/data/liverpool_lens/",
+    "astrometry-data": "/usr/local/Cellar/astrometry-net/0.73/data/"
+  },
+  "external":{
+    "sextractor":"/opt/anaconda3/bin/sex",
+    "psfex":"/opt/anaconda3/bin/psfex",
+    "swarp":"/opt/anaconda3/bin/swarp",
+    "stilts":"java -jar /Applications/astro/stilts.jar",
+    "galfit":"/Applications/astro/./galfit",
+    "scamp": "/opt/anaconda3/bin/scamp"
+  },
+  "tapqueries":{
+    "gaia-astrometry": "SELECT ra as RA, dec as DEC, phot_bp_mean_mag as MAG FROM 'I/345/gaia2' WHERE  1=CONTAINS(POINT('ICRS', ra, dec), CIRCLE('ICRS', {0}, {1}, {2} ))"
+  },
+  "services":{
+    "vizier":"http://tapvizier.u-strasbg.fr/TAPVizieR/tap"
+  },
+  "commands": {
+    "astrometry_main_path": "/usr/local/astrometry/bin/",
+    "astrometry_solved_file": "solve-field --scale-units arcsecperpix --scale-low {0} --scale-high {1} {2} --overwrite --backend-config {3}",
+    "astrometry_build_index": "build-astrometry-index -i {0} -e1 -o {1} -P {2} -S MAG -E",
+    "sip_tav_path": "cd /Applications/astro/sip_tpv-master/sip_tpv/",
+    "run_sip_tav" : "python sip_to_pv.py {0} {1}  --write_tan_sip"
+  },
+  "database": {
+    "mongodb": {
+      "dbname": "iacbroker",
+      "collection": "snhunter"
+    }
+  }
+}

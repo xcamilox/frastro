@@ -28,8 +28,19 @@ class VHSAchiveCP(ContentProvider):
 
     __wavelenght = {"g": 475 * u.nm, "r": 635 * u.nm, "i": 775 * u.nm, "z": 925 * u.nm, "y": 1000 * u.nm}
 
+    __key_band = {"mag_j":"jPetroMag","mag_g": "gPetroMag", "mag_r": "rPetroMag", "mag_i": "iPetroMag", "mag_z": "zPetroMag", "mag_y": "yPetroMag","mag_ks":"ksPetroMag"}
+
     def __init__(self):
         pass
+
+
+    def getBand(self, band):
+
+        key_band = ""
+        if band in self.__key_band:
+            key_band = self.__key_band[band]
+        return key_band
+
 
     def query(self, **kwargs):
         if "coordinates" in kwargs:
@@ -45,33 +56,7 @@ class VHSAchiveCP(ContentProvider):
 
 
 
-        degrees_range=CoordinateParser.getMinToDegree(radius)
-
-        ra_min = self.__coordinates.ra.degree - (degrees_range/2)
-        ra_max = self.__coordinates.ra.degree + (degrees_range/2)
-        dec_min = self.__coordinates.dec.degree - (degrees_range/2)
-        dec_max = self.__coordinates.dec.degree + (degrees_range/2)
-
-
-        table = self.__service_provider["video"]["table"]
-        query = self.__simple_rec_query.format(table, ra_min, ra_max, dec_min, dec_max)
-        url = self.__service_provider["video"]["url"]
-        respond=self.getTapRequest(url=url,query=query)
-        program="video"
-        if len(respond) <= 0:
-            table = self.__service_provider["viking"]["table"]
-            query = self.__simple_rec_query.format(table, ra_min, ra_max, dec_min, dec_max)
-            url = self.__service_provider["viking"]["url"]
-            respond = self.getTapRequest(url=url, query=query)
-            program = "viking"
-
-        if len(respond) <= 0:
-            table = self.__service_provider["vhs"]["table"]
-            query = self.__simple_rec_query.format(table, ra_min, ra_max, dec_min, dec_max)
-            url = self.__service_provider["vhs"]["url"]
-            respond = self.getTapRequest(url=url, query=query)
-            program = "vhs"
-
+        respond = self.getCatalog(self.__coordinates.ra.degree,self.__coordinates.dec.degree,radius)
 
         result = AstroSource(self.__coordinates)
         if len(respond) > 0:
@@ -92,7 +77,7 @@ class VHSAchiveCP(ContentProvider):
             result.addSummaryParams("distance", loss)
             mag = {"Y": str(respond["yAperMag3"][index])+"+/-"+str(respond["yAperMag3Err"][index]), "J": str(respond["jAperMag3"][index])+"+/-"+str(respond["jAperMag3Err"][index]),
                    "H": str(respond["hAperMag3"][index])+"+/-"+str(respond["hAperMag3Err"][index]), "Ks": str(respond["ksAperMag3"][index])+"+/-"+str(respond["ksAperMag3Err"][index])}
-            if program=="video" or program=="viking":
+            if self.program=="video" or self.program=="viking":
                 result.addSummaryParams("magpetro_z", {"lambda": vhs["z"], "ab": str(respond["zPetroMag"][index]),"err":str(respond["zPetroMagErr"][index])})
                 result.addSummaryParams("magAper_z", {"lambda": vhs["z"], "ab": str(respond["zAperMag3"][index]),"err":str(respond["zAperMag3Err"][index])})
                 mag["Z"] = str(respond["zAperMag3"][index])+"+/-"+str(respond["zAperMag3Err"][index])
@@ -110,7 +95,7 @@ class VHSAchiveCP(ContentProvider):
 
             result.addSummaryParams("type", str(respond["mergedClass"][index]))
 
-            images= self.getImages(program)
+            images= self.getImages(self.program)
 
             image = ImageSource(result.getSummary()["id"], self.__catalog_provider)
 
@@ -137,6 +122,41 @@ class VHSAchiveCP(ContentProvider):
             result.addImage(image)
 
         return result
+
+
+
+    def getCatalog(self,ra,dec,radius):
+        self.__coordinates = str(ra) + "," + str(dec)
+        radius = radius  # arcmin
+        self.__coordinates = CoordinateParser.validateCoordinates(self.__coordinates)
+
+        degrees_range = CoordinateParser.getMinToDegree(radius)
+
+        ra_min = self.__coordinates.ra.degree - (degrees_range / 2)
+        ra_max = self.__coordinates.ra.degree + (degrees_range / 2)
+        dec_min = self.__coordinates.dec.degree - (degrees_range / 2)
+        dec_max = self.__coordinates.dec.degree + (degrees_range / 2)
+
+        table = self.__service_provider["video"]["table"]
+        query = self.__simple_rec_query.format(table, ra_min, ra_max, dec_min, dec_max)
+        url = self.__service_provider["video"]["url"]
+        respond = self.getTapRequest(url=url, query=query)
+        self.program = "video"
+        if len(respond) <= 0:
+            table = self.__service_provider["viking"]["table"]
+            query = self.__simple_rec_query.format(table, ra_min, ra_max, dec_min, dec_max)
+            url = self.__service_provider["viking"]["url"]
+            respond = self.getTapRequest(url=url, query=query)
+            self.program = "viking"
+
+        if len(respond) <= 0:
+            table = self.__service_provider["vhs"]["table"]
+            query = self.__simple_rec_query.format(table, ra_min, ra_max, dec_min, dec_max)
+            url = self.__service_provider["vhs"]["url"]
+            respond = self.getTapRequest(url=url, query=query)
+            self.program = "vhs"
+
+        return respond
 
     def getTapRequest(self,url, query=""):
 

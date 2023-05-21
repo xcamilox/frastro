@@ -55,3 +55,18 @@ class CoordinateParser():
         index = np.where(loss.min() == loss)[0][0]
         return index,loss.min()
 
+
+
+
+
+if __name__ == "__main__":
+    print(CoordinateParser.getSecToDegree(1))
+"""
+>>> c = SkyCoord(ra=10.68458*u.degree, dec=41.26917*u.degree)
+>>> c.to_string('decimal')
+'10.6846 41.2692'
+>>> c.to_string('dms')
+'10d41m04.488s 41d16m09.012s'
+>>> c.to_string('hmsdms')
+'00h42m44.2992s +41d16m09.012s'
+"""

@@ -1,6 +1,6 @@
 import json
-from frastro import Utils
-from frastro import ImageUtils
+from frastro.frastro.core.utils.utils import Utils
+from frastro.frastro.core.utils.image_util import ImageUtils
 import datetime
 class ImageSource(object):
     __name=""
@@ -14,6 +14,7 @@ class ImageSource(object):
         self.__provider=provider
         self.__cutouts=[]
         self.__files = []
+        self.__type = "image"
         if save_path !="":
             self.__save_path = save_path
 
@@ -24,7 +25,7 @@ class ImageSource(object):
 
         self.__cutouts.append({"url":url,"size":size,"band":str(band),"magnitude":str(magnitude),"link":link})
 
-    def addFile(self,name,url,type="fits",download=True,local_path="",uncompress=False,thumbnail=True,external=False):
+    def addFile(self,name,url,type="fits",download=False,local_path="",uncompress=False,thumbnail=True,external=False):
 
         if download:
             if local_path == "":
@@ -46,5 +47,5 @@ class ImageSource(object):
     def getFiles(self):
         return self.__files
     def __dict__(self):
-        image={"name":self.__name,"provider":self.__provider,"cutouts":self.__cutouts,"files":self.__files}
+        image={"name":self.__name,"provider":self.__provider,"cutouts":self.__cutouts,"files":self.__files,"type":self.__type}
         return image

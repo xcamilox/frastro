@@ -27,10 +27,18 @@ class CFHTAchiveCP(ContentProvider):
     __save_path = "/Users/cjimenez/Documents/PHD/data/tmp/{0}/cfht/"
     #all unit in micras
     __wavelenght={"u":335*u.nm,"g":475*u.nm,"r":640*u.nm,"i":776*u.nm,"z":925*u.nm}
+    __key_band = {"mag_u": "umag", "mag_g": "gmag", "mag_r": "rmag", "mag_i": "imag", "mag_z": "zmag"}
 
 
     def __init__(self):
         pass
+
+    def getBand(self, band):
+
+        key_band = ""
+        if band in self.__key_band:
+            key_band = self.__key_band[band]
+        return key_band
 
 
     def query(self, **kwargs):
@@ -216,6 +224,30 @@ class CFHTAchiveCP(ContentProvider):
 
         browser.quit()
         return list_img
+
+
+    def getCatalog(self,ra,dec,radius):
+
+        self.__coordinates = str(ra) + "," + str(dec)
+        radius = radius  # arcmin
+        self.__coordinates = CoordinateParser.validateCoordinates(self.__coordinates)
+        self.__save_path = self.__save_path.format(
+            str(self.__coordinates.ra.degree) + "_" + str(self.__coordinates.dec.degree))
+
+        width_survey = "w"
+        deep_survey = "d"
+
+        radius_degree = CoordinateParser.getMinToDegree(radius)
+
+        query = self.__simple_rec_query.format(deep_survey, self.__coordinates.ra.degree, self.__coordinates.dec.degree, radius_degree)
+        respond = self.getTapRequest(query=query)
+        if len(respond) <= 0:
+            query = self.__simple_rec_query.format(width_survey, self.__coordinates.ra.degree,
+                                                   self.__coordinates.dec.degree, radius_degree)
+            respond = self.getTapRequest(query=query)
+
+        return respond
+
 
     def getTapRequest(self, query=""):
 

@@ -32,6 +32,17 @@ class WiseAllWiseArchiveCP(ContentProvider):
 
     __wavelenght = {"w1": 3352.60 * u.nm, "w2": 4602.80 * u.nm, "w3": 11560.80 * u.nm, "w4": 22088.30 * u.nm}
 
+
+
+    __key_band = {"mag_w1": "W1mag", "mag_w2": "W2mag", "mag_w3": "W3mag", "mag_w4": "W4mag"}
+
+    def getBand(self, band):
+
+        key_band = ""
+        if band in self.__key_band:
+            key_band = self.__key_band[band]
+        return key_band
+
     def __init__(self, catalog_provider='wiseAllwise'):
         self.__catalog_provider = catalog_provider
 
@@ -103,8 +114,11 @@ class WiseAllWiseArchiveCP(ContentProvider):
 
             result.addSummaryParams("allwise_w4mag", data)
 
-            data = {"lambda": allWiseWavelenght["j"], "ab": str(all_wise["Jmag"][index]),
-                    "err": str(all_wise["e_Jmag"][index])}
+            try:
+                data = {"lambda": allWiseWavelenght["j"], "ab": str(all_wise["Jmag"][index]),
+                        "err": str(all_wise["e_Jmag"][index])}
+            except KeyError:
+                print("not found J")
 
 
             result.addSummaryParams("allwise_Jmag", data)
@@ -178,7 +192,20 @@ class WiseAllWiseArchiveCP(ContentProvider):
 
         return result
 
+    def getCatalog(self, ra, dec, radius):
 
+        # check for data release to use
+        self.__coordinates = str(ra) + "," + str(dec)
+        radius = radius  # arcmin
+        self.__coordinates = CoordinateParser.validateCoordinates(self.__coordinates)
+
+        self.__radius_degree = CoordinateParser.getMinToDegree(radius)
+
+        all_wise = self.getData(self.__service_provider["all_wise"]);
+        wise = self.getData(self.__service_provider["wise"]);
+
+
+        return wise
 
     def getData(self,table):
 
